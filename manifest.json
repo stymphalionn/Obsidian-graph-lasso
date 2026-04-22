@@ -1,0 +1,10 @@
+{
+	"id": "graph-lasso",
+	"name": "Graph Lasso",
+	"version": "0.4.10",
+	"minAppVersion": "1.5.0",
+	"description": "Marquee or lasso selection on the core graph, then batch-open, copy paths, or delete notes.",
+	"author": "Github/Stymphalionn",
+	"authorUrl": "https://github.com/stymphalionn",
+	"isDesktopOnly": true
+}

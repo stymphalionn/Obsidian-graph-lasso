@@ -1,0 +1,168 @@
+## 21Apr26 — Initial implementation (Graph Lasso plugin)
+
+- **Trigger:** Plan “Obsidian plugins, core graph integration, and lasso selection”.
+- **Actions:** Added MIT plugin under `Cursor AI Projects/obsidian-graph-lasso`: marquee + lasso hit-tests using `renderer.nodes` + `circle.getGlobalPosition()` (pattern documented in `GRAPH_LASSO_HOOKS.md` from read-only Extended Graph spike). Context menu: open all, sequential open, copy paths, delete with modal. Space bypasses overlay for pan; Escape clears selection.
+- **Successes:** Single codebase covers spike notes + MVP + menu + lasso + touch guidance in settings copy.
+- **Risks / follow-ups:** Undocumented Obsidian graph internals; verify icon `git-branch` exists on target Obsidian build; canvas `color-mix` in marquee may be unsupported in older Electron—fallback untested.
+- **Install:** Built artifacts copied to `Obsidian Vault 2026/.obsidian/plugins/graph-lasso/` (enable **Graph Lasso** in Community plugins / restricted mode as applicable).
+
+## 21Apr26 — v0.2.0 menu + marching ants
+
+- **Trigger:** User request—tag/link/clipboard menu depth, marching ants + 5% mask, survey other lasso tools.
+- **Actions:** `selectionChrome.ts` SVG mask + dual dashed stroke animation; settings `selectionMaskOpacity`; context menu sections for tags, links (wikilinks TSV/MD, incoming resolved TSV, bulk body replace), clipboard (titles, TSV, frontmatter JSON, first lines); `batchTagLinkClipboard.ts` + `modals.ts`; doc `OTHER_LASSO_TOOLS.md`.
+- **Risks:** Bulk `[[from]]` replace is naive string split; YAML-only tag remove as documented in README.
+
+## 21Apr26 — v0.3.0 toolbar, wheel zoom, Shift/Alt, tag pickers, find/replace, Bases
+
+- **Trigger:** Plan Graph Lasso v0.3 UX.
+- **Actions:** `graphToolbar.ts` injects controls after Animate heuristic; `selectionController` forwards `wheel`, `touch-action: manipulation`, multi-region `ChromeRegion[]` with subtract styling; `tagPickers.ts` union-tag checklists + bulk add; `bulkFindReplace.ts` preview table + apply; `basesFromSelection.ts` YAML `file.path` OR filter; settings `showRibbonButton` (default off), default shape `lasso`; `main.refreshRibbonIcon`.
+- **Follow-ups:** Confirm `file.path == "…"` filter dialect on your Obsidian version; refine toolbar anchor if Animate button copy changes locale.
+
+## 21Apr26 — v0.3.1 command-palette attach, hit-test scale, toolbar anchor
+
+- **Trigger:** User report — lasso unusable, toolbar not where expected, palette command did not seem to enable the tool (Obsidian 1.12.x CLI / local extract).
+- **Actions:** `resolveGraphLeafForTool()` in `graphAccess.ts` (active graph → previous attachment → first graph leaf). `nodeScreenPosition()` scales `getGlobalPosition()` by `interactiveEl` CSS box vs `renderer.px.view` backing size. Toolbar insert prefers `.graph-controls` before Animate heuristic.
+- **Verify:** Toggle tool from palette with graph in a split; marquee/lasso should select notes; toolbar appears beside the graph control strip.
+
+## 21Apr26 — v0.3.2 pin after timelapse + addIcon asset
+
+- **Trigger:** User asked for controls **under / after the magic wand** (`.mod-animate` / Start timelapse animation) and a **custom asset icon** for toggle.
+- **Actions:** `registerGraphLassoIcon()` + `graph-lasso-toggle` SVG via `addIcon`; persistent **pin** after wand with `setTooltip`; marquee/lasso bar only when tool on; ribbon uses same icon. `suspendChromeSync` on unload so pins are not reinserted after teardown.
+
+## 21Apr26 — v0.3.3 addIcon format fix (blank icon)
+
+- **Cause:** Obsidian `addIcon` expects **SVG fragment only** (no wrapping `<svg>`) and a **0 0 100 100** logical box; a full 18×18 `<svg>` string rendered empty.
+- **Fix:** Inner `<g>` with paths in 0–100 coords + stroke-width 8 (same scale as Extended Graph’s custom icons). Ref: `obsidian-developer-docs` Icons.md.
+
+## 21Apr26 — v0.3.4 shape strip always visible + distinct shape icons
+
+- **Issue:** Marquee/lasso only appeared after enabling the tool; both used `pickIcon` fallback **`circle`** when Lucide ids were missing → two identical circles.
+- **Fix:** Always inject shape bar after pin. Register **`graph-lasso-shape-marquee`** and **`graph-lasso-shape-freehand`** via `addIcon` (100-box fragments). Pin alone shows `is-active` when overlay is on.
+
+## 21Apr26 — v0.3.5 file debug log + CLI tail
+
+- **Trigger:** User asked for debugging visible while monitoring a terminal.
+- **Actions:** `debugLog.ts` appends to `plugins/graph-lasso/debug.log` via Node `fs` (desktop); settings + commands toggle / copy path / clear; instrumentation on tool, tryAttach, gesture, menu, graph UI sync (verbose).
+
+## 21Apr26 23:57:15 — v0.4.0 inline button-state overhaul
+
+- **Trigger:** Plan execution for “core graph extension + radio-style icon swaps.”
+- **Actions:** Reworked `src/graphToolbar.ts` to use native inline `.graph-controls-button` siblings; pin icon now swaps `lasso-select` ↔ `lasso`; shape buttons only render when tool is ON and swap icons by active shape; removed custom shape SVG icon registrations; updated toolbar-active CSS and metadata/author fields.
+- **Lessons Learned — what worked:** Using the same native graph control button class removed offset/pill drift and made state affordances immediately legible.
+- **Lessons Learned — needs change:** Keep Lucide IDs constrained to confirmed Obsidian-bundled names to avoid icon fallback regressions across app versions.
+
+## 22Apr26 — v0.4.1 graph chrome DOM + deferred sync
+
+- **Trigger:** Ribbon worked but in-graph toolbar (lasso pin) did not appear — controls often mount under `contentEl`, not `containerEl`-only queries.
+- **Actions:** Added `src/graphDom.ts` (`getGraphDomRoot`, `findGraphToolbarAnchor`, strip/header fallbacks); `graphToolbar.ts` anchors from `contentEl`; `SelectionController.scheduleChromeSync()` runs immediate + rAF ×2 + 80ms + 350ms retries on `active-leaf-change` / `layout-change` / load.
+- **Lessons:** Treat graph control insertion as timing-sensitive; a single sync on layout events can run before `.graph-controls` exists.
+
+## 22Apr26 — v0.4.2 toolbar must not wait for `interactiveEl`
+
+- **Trigger:** User still saw no timelapse-strip button despite community DOM steps; file history sparse (`git log` only typo on toolbar files).
+- **Root cause:** `syncGraphLassoUi` gated on `getGraphLeafView()` (needs `renderer.interactiveEl` + `nodes`). Extended Graph only needs `view.contentEl.querySelector(".graph-controls")` — the strip exists before / independently of hit-test internals; if `interactiveEl` is missing or delayed, we never injected.
+- **Actions:** `isCoreGraphLeaf()` view-type gate for toolbar; `findGraphToolbarAnchorForLeaf()` tries `contentEl` then `containerEl`; verbose logs add `rendererReady`; `scheduleChromeSync` adds 800ms + 2000ms retries. **Reference:** `obsidian-extended-graph-src/src/ui/menu.ts` (`contentEl.querySelector(".graph-controls")`).
+- **CLI:** Hot Reload: `obsidian vault="Obsidian Vault 2026" command id=hot-reload:scan-for-changes`; full reload: `command id=app:reload`.
+
+## 22Apr26 — v0.4.3 debug log absolute path + MutationObserver
+
+- **Trigger:** User reported "still not working" — no pin appearing next to timelapse, no `debug.log` file despite `debugLogToFile: true` in `data.json`.
+- **Root cause 1 (logger):** `debugLog.ts` passed **`manifest.dir`** (vault-relative, e.g. `.obsidian/plugins/graph-lasso`) to `fs.appendFileSync`; Electron resolved it against the app cwd so `debug.log` landed nowhere visible to the user. Added `FileSystemAdapter.getBasePath()` resolution — file now appears at `<vault>/.obsidian/plugins/graph-lasso/debug.log`.
+- **Root cause 2 (strip redraws):** Core `.graph-controls` re-renders children on internal state changes; our `layout-change` / `active-leaf-change` retries could still miss a redraw. Added per-strip **`MutationObserver`** (`childList: true` on anchor's parent) that re-runs `syncGraphLassoUi` the moment the pin is missing; re-entrancy guarded by a flag + `isConnected` check (observer self-disconnects when its parent leaves the DOM).
+- **Diagnostics:** New `ui.pin-inserted`/`ui.pin-present`/`ui.mutation.reinject` events; insertion log captures the anchor parent's `tagName` + `className` so we can confirm the pin lands in `.graph-controls` vs an unexpected container.
+- **Verification:** Post-reload debug log shows **1** `ui.pin-inserted` followed by **17** `ui.syncGraphLassoUi` calls with the pin already present (`parentClass: "graph-controls is-close"`) and zero `mutation.reinject` — confirms pin persists without rescue.
+- **Lessons — what worked:** Fixing the silent logger first made the real state observable and stopped us guessing; the single-insertion log pattern (insert+event once, present+retain on subsequent syncs) is now visible end-to-end.
+- **Lessons — needs change:** Keep a documented mental model of `manifest.dir` being vault-relative — any future `fs` or `path` API in plugin code must resolve through `FileSystemAdapter.getBasePath()` (or `app.vault.adapter.getFullPath(rel)` when exposed). Add a lint/README note.
+
+## 22Apr26 — v0.4.5 visible timelapse anchor (not the collapsed `.graph-controls`)
+
+- **Trigger:** User screenshots: lasso on **app ribbon** OK; graph’s **vertical** gear / wand strip had **no** pin. v0.4.4 diag (red/yellow) still invisible — same structural bug.
+- **Root cause:** `findGraphToolbarAnchor` stopped at the **first** `.graph-controls` in `contentEl` and the first `.mod-animate` inside it. That tree is **`graph-controls is-close`** (collapsed filters accordion). Obsidian duplicates (or mirrors) control UI: **hidden** nodes stay in DOM; the **visible** wand lives in another subtree. We inserted next to the hidden wand → pin existed in DOM (`debug.log`) but never on the strip the user sees.
+- **Actions:** `findGraphToolbarAnchorForLeaf` now scans **`leaf.view.containerEl`** only, collects **all** `.graph-controls-button.mod-animate` (then fallbacks), scores by **`isGraphControlLikelyVisible`** + **penalty** if inside `.graph-controls.is-close`, picks max score. Same scoring for fallback `.graph-controls-button` list. Removed v0.4.4 temporary DOM dump / pin rect / garish inline styles; `ui.pin-inserted` adds `anchorLikelyVisible` + `anchorInsideClosedGraphControls` for quick log checks.
+- **Verification:** After reload, pin should sit **after the magic wand** on the **graph-local** vertical control stack; `debug.log` should show `anchorLikelyVisible: true` and ideally `anchorInsideClosedGraphControls: false`.
+
+## 22Apr26 — v0.4.6 Extended Graph–style `.graph-controls` host, single dual-state button
+
+- **Trigger:** User asked to match **01-test-asset** placement (`hr` + `graph-controls-button.mod-*` inside `.graph-controls`), single toggle (no side-by-side shape pair), icon must change with on/off and mode.
+- **Actions:** `findExtendedGraphStyleControlsHost()` in `graphDom.ts` picks the **visible** `.graph-controls` among duplicates (scores like timelapse anchor). `graphToolbar.ts` appends separator + one `mod-graph-lasso` button; removed inline marquee/lasso pair; **off** → `lasso-select`, **on + lasso** → `lasso`, **on + marquee** → `square`; `is-active` + tooltips; `MutationObserver` on the **host**; `styles.css` mirrors test asset `is-close` visibility + sep rules. Version **0.4.6**; README toolbar copy.
+- **Lessons:** Injection as **children** of the scored `.graph-controls` matches Extended Graph / community patterns and avoids fighting sibling order next to a hidden wand clone.
+
+## 22Apr26 — v0.4.7 `HOWTO-graph-toolbar-button.md` compliance (still invisible / wrong host)
+
+- **Root cause:** Scored “best” `.graph-controls` and plugin-global `syncGraphLassoUi` did not match the HOWTO’s proven checklist: **contentEl-first host**, per-leaf **`Component` + `addChild`**, **`ExtraButtonComponent`**, **`getLeavesOfType`**, **`resize` + `onLayoutReady`**, staggered retries.
+- **Actions:** `findGraphControlsHost()` replaces heuristic host. **`GraphLassoLeafToolbar`** uses HOWTO inject + host observer; **`main.ts`** owns `Map` + `scheduleGraphToolbarSync` / `syncAllGraphToolbars` + `getGraphToolbarHost()`. **`selectionController.syncGraphChrome()`** calls `syncAllGraphToolbars()` only.
+- **Lessons:** Treat `HOWTO-graph-toolbar-button.md` as the source of truth for graph toolbar injection; duplicate `.graph-controls` nodes make “smart” host picking a liability.
+
+## 22Apr26 — v0.4.8 overlay must not cover `.graph-controls` (toggle stuck on)
+
+- **Symptom:** Toolbar button turned the tool **on** but a second click did not turn it **off** (UI looked stuck active).
+- **Root cause:** Lasso overlay used **`position:absolute; inset:0`** on `interactiveEl.parentElement`. That parent can span the **entire graph leaf** (canvas **and** the vertical control strip). The full-size transparent overlay then sat **above** the lasso toggle and ate pointer events.
+- **Actions:** `syncOverlayFrame(view)` aligns overlay **top/left/width/height** to `interactiveEl.getBoundingClientRect()` relative to the parent (+ scroll). `ResizeObserver` also observes `interactiveEl`. Toolbar `onClick` resolves host via `this.getToolbarHost()` each click.
+- **Lessons:** Graph “canvas parent” ≠ “canvas box”; hit-testing overlay must match **interactiveEl** geometry, not the wrapper’s full box.
+
+## 22Apr26 — v0.4.9 hard isolation: mount overlay on `interactiveEl`
+
+- **Symptom:** Crosshair persisted while hovering graph toolbar controls; toggle still sometimes could not switch off.
+- **Root cause:** Even with frame math, mounting to `interactiveEl.parentElement` left room for stack/geometry drift where overlay hit-area overlapped control chrome.
+- **Actions:** `tryAttach()` now mounts overlay directly to `view.renderer.interactiveEl` (positioned relative if needed). Removed parent-relative offset math in `syncOverlayFrame()` and set local frame `left/top=0` with `interactiveEl.clientWidth/Height`.
+- **Lessons:** For graph selection overlays, the safest layer boundary is the exact interaction surface (`interactiveEl`) rather than any wrapper element.
+
+## 22Apr26 — targeted publish polish
+
+- **Actions:** Normalized command IDs/names for Obsidian command lint (`debug-*` without plugin prefix), updated notices to sentence case, replaced manual settings headings with `Setting(...).setHeading()`, removed hardcoded `.obsidian` path in settings copy via `app.vault.configDir`, and switched recent overlay style writes to `setCssStyles` + host CSS class.
+- **Outcome:** Build clean; publish-facing UX strings and command metadata now align better with Obsidian plugin conventions.
+
+## 22Apr26 — v0.4.10 command-to-button state sync parity
+
+- **Symptom:** Toolbar button toggled reliably, but command-triggered toggles did not always reflect on the same button state path.
+- **Actions:** Added `toggleToolAndSyncChrome()` in `main.ts` and routed both command-palette toggle and ribbon toggle through it. Shape commands now also call `scheduleGraphToolbarSync()` after save.
+- **Outcome:** Command, ribbon, and toolbar button now share the same sync lifecycle (immediate + staggered retries), reducing state drift.
+
+## 22Apr26 — v0.4.11 toolbar click executes command ID
+
+- **Symptom:** Toolbar click still felt out-of-sync with command behavior.
+- **Actions:** `GraphLassoLeafToolbar` now calls `requestToggleViaCommand()`; `main.ts` resolves and executes `graph-lasso:toggle-graph-select-tool` via `app.commands.executeCommandById(...)` with safe fallback to direct toggle+sync if command resolution fails.
+- **Outcome:** Toolbar click now runs the exact same registered command path as command palette / hotkey.
+
+## 22Apr26 — repair: `requestToggleViaCommand` missing from `getGraphToolbarHost()`
+
+- **Trigger:** User report — graph lasso toolbar / activation buttons no longer toggled the tool; commands felt disconnected.
+- **Root cause:** `GraphToolbarHost` in `graphToolbar.ts` requires **`requestToggleViaCommand`**, and the pin’s `.onClick` calls it. **`getGraphToolbarHost()` in `main.ts` never supplied that property**, so `tsc` failed with TS2741 and at runtime the click handler invoked **`undefined`** (silent failure or throw depending on bundler/minifier).
+- **Actions:** Implemented `requestToggleViaCommand` on the host object: prefer **`(app as AppCommands).commands.executeCommandById(\`${manifest.id}:toggle-graph-select-tool\`)`** so palette logging matches; **fallback** to `toggleToolAndSyncChrome()` if `executeCommandById` returns false. Added **`AppCommands`** helper type (runtime API; Obsidian typings omit `commands` in this repo’s `obsidian` version).
+- **Verify:** `npm run build` clean; in Obsidian, graph pin + **Toggle graph select tool** command both toggle; optional `tail -f` on plugin `debug.log` should show `command.toggle-graph-select-tool` when using the pin.
+- **Obsidian CLI (reload after copy):** `obsidian vault="Obsidian Vault 2026" command id=hot-reload:scan-for-changes` or `command id=app:reload` (Obsidian must be running with CLI enabled).
+
+## 22Apr26 14:22:37 — build + deploy to Vault 2026
+
+- **Trigger:** User asked to build and update automatically.
+- **Actions:** `npm run build` in repo; copied `main.js`, `manifest.json`, `styles.css` → `Obsidian Vault 2026/.obsidian/plugins/graph-lasso/` (left `data.json` / `debug.log` untouched). Ran `obsidian vault="Obsidian Vault 2026" command id=hot-reload:scan-for-changes` — **Executed** OK.
+
+## 22Apr26 — Cursor debug mode: agent NDJSON instrumentation (session 36a6f0)
+
+- **Trigger:** User reports lasso still not resolving; debug-mode workflow requires runtime evidence before a targeted fix.
+- **Actions:** Added `src/debugAgentIngest.ts` (POST to Cursor ingest; later dropped redundant `fs` append to avoid duplicate NDJSON lines). Instrumented `graphToolbar.ts` pin click (**H1**), `main.ts` `requestToggleViaCommand` / command callback / onload / ribbon (**H2–H5**), `selectionController.ts` `setToolActive` (**H4**). Rebuilt and deployed `main.js`; hot-reload via CLI.
+- **Evidence:** NDJSON proved pin → `executeCommandById` → callback → `setToolActive(true)`. Plugin `debug.log` showed `tryAttach.attached` and **`ui.pin-inserted` hostClass always included `graph-controls is-close`** — pin lived on the **collapsed filters** host, not the visible wand strip (**H6 CONFIRMED**).
+- **Fix:** `findGraphControlsHost()` now gathers **all** `.graph-controls` under the leaf, scores visibility + visible child buttons + **`is-close` penalty**, picks best — restores v0.4.5-style “visible strip” behavior without abandoning HOWTO `ExtraButtonComponent` pattern.
+
+## 22Apr26 — debug iteration: overlay/reticle path
+
+- **Trigger:** User reports status text appears (`Graph select: lasso ...`) but there is still **no reticle / no selection effect**.
+- **Evidence update:** H1–H4 remain rejected: click, command dispatch, callback, and `setToolActive(true)` all occur. The prior host-selection refactor did **not** explain the missing reticle, so it was **reverted**.
+- **Actions:** Added focused instrumentation in `selectionController.ts` for `tryAttach()` and `onPointerDown()` to capture `interactiveEl` geometry, computed style, overlay size after attach, and whether the overlay ever receives pointer events. Rebuilt, deployed, hot-reloaded, and cleared `debug-36a6f0.log` for a clean rerun.
+
+## 22Apr26 — confirmed root cause: overlay mounted on canvas
+
+- **Evidence:** NDJSON `H7/H8` shows `interactiveEl` is **`tagName: "CANVAS"`**, `clientWidth: 1699`, `clientHeight: 826`, but after attach the overlay still reports **`overlayRectWidth: 0`**, **`overlayRectHeight: 0`** despite style widths being set. That means the overlay exists in code but has no rendered box.
+- **Root cause:** We were appending the lasso overlay **as a child of the canvas itself**. A canvas is the drawing surface, not a normal layout container for visible HTML children, so the overlay never produced an on-screen reticle.
+- **Fix:** Mount the overlay on the canvas’s **parent element**, keep sizing based on `interactiveEl`, and frame the overlay to the canvas’s visible box using parent-relative offsets. Instrumentation remains for verification.
+
+## 22Apr26 — verification follow-up: overlay blocked graph controls
+
+- **Evidence:** After the mount fix, NDJSON showed `H8` success (`overlayRectWidth: 1699`, `overlayRectHeight: 826`) and `H9` pointerdown events on the overlay, but there was **no second `graphToolbar.ts:pin-onClick`** when the user tried to toggle off from the graph strip. The same session only showed an off-toggle via **ribbon**.
+- **Root cause:** The restored full-size overlay now sat above the graph controls in hit-testing order, so a toolbar click landed on the overlay instead of the pin.
+- **Fix:** In `selectionController.ts`, when the overlay receives `pointerdown`, inspect `document.elementsFromPoint(...)`; if a real `.graph-controls-button` sits underneath, forward the click to that button and **do not** start a lasso gesture. Added `H10` instrumentation to prove this path during verification.
+
+## 22Apr26 — instrumentation cleanup
+
+- **Trigger:** User confirmed the issue is fixed and asked to remove the debug instrumentation.
+- **Actions:** Removed session-only `agentDebugLog` calls from `main.ts`, `graphToolbar.ts`, and `selectionController.ts`; deleted `src/debugAgentIngest.ts`; kept the proven fixes (command path routing, parent-mounted overlay, control-click forwarding). Rebuilt, redeployed, and hot-reloaded the plugin.

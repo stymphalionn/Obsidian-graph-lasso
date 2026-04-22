@@ -1,0 +1,52 @@
+/* Like core + Extended Graph: collapsed `.graph-controls.is-close` hides plugin buttons unless re-shown. */
+.graph-controls.is-close .graph-controls-button.mod-graph-lasso {
+	display: flex;
+	margin-top: var(--size-4-2);
+}
+
+/* Separator only while the filters panel is collapsed (matches 01-test-asset / Extended Graph). */
+.graph-controls:not(.is-close) .graph-lasso-plugin-sep {
+	display: none;
+}
+
+.graph-lasso-plugin-sep {
+	margin-block: 0.5rem;
+	border: none;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.graph-lasso-modal-buttons {
+	display: flex;
+	gap: 8px;
+	margin-top: 12px;
+}
+
+.graph-lasso-overlay {
+	box-sizing: border-box;
+}
+
+.graph-lasso-overlay-host {
+	position: relative;
+}
+
+.graph-lasso-chrome {
+	overflow: visible;
+	pointer-events: none;
+}
+
+.graph-lasso-plugin-pin.is-active {
+	background-color: var(--background-modifier-hover);
+}
+
+.graph-lasso-fr-table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.graph-lasso-fr-table th,
+.graph-lasso-fr-table td {
+	border: 1px solid var(--background-modifier-border);
+	padding: 4px 6px;
+	text-align: left;
+	vertical-align: top;
+}
